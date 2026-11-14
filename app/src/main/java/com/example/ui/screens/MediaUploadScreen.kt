@@ -806,6 +806,16 @@ fun MediaUploadScreen(
                 }
             }
 
+            if (selectedCategory == UploadCategory.STORY) {
+                Text(
+                    text = "Story publishing will be connected with 24-hour expiry and viewer tracking in the next stage.",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             // 3. Upload Progress & State Card (YouTube/WhatsApp style)
             AnimatedVisibility(visible = uploadPhase !is UploadPhase.Idle || isUploading) {
                 UploadProgressOverlay(phase = if (isUploading) UploadPhase.Uploading((uploadProgressPercent ?: 0) / 100f, 1, 1) else uploadPhase)
@@ -814,7 +824,7 @@ fun MediaUploadScreen(
             // 4. Primary Upload / Publish Button
             val isReady = selectedMediaUri != null &&
                     (selectedCategory != UploadCategory.TUBE || titleText.isNotBlank()) &&
-                    uploadPhase is UploadPhase.Idle && !isUploading
+                    uploadPhase is UploadPhase.Idle && !isUploading && selectedCategory != UploadCategory.STORY
 
             Button(
                 onClick = {
@@ -826,11 +836,6 @@ fun MediaUploadScreen(
                                 .filter { it.isNotBlank() }
                             val mimeType = context.contentResolver.getType(uri).orEmpty()
                             val isVideo = mimeType.startsWith("video/")
-                            if (selectedCategory == UploadCategory.STORY) {
-                                uploadPhase = UploadPhase.Processing("Story publishing is being prepared")
-                                return@launch
-                            }
-                            uploadPhase = UploadPhase.Processing("Requesting secure upload permission...")
                             onPostCreated(
                                 selectedCategory.postFormat,
                                 if (selectedCategory == UploadCategory.TUBE) titleText else if (selectedCategory == UploadCategory.FILES) (titleText.ifBlank { selectedFileName ?: "Attached File" }) else null,
@@ -857,7 +862,7 @@ fun MediaUploadScreen(
             ) {
                 Text(
                     text = when (uploadPhase) {
-                        is UploadPhase.Idle -> "Upload to OmniBox"
+                        is UploadPhase.Idle -> if (selectedCategory == UploadCategory.STORY) "Story System Coming Soon" else "Upload to OmniBox"
                         is UploadPhase.Uploading -> "Streaming Binary Chunks..."
                         is UploadPhase.Processing -> "Transcoding..."
                         is UploadPhase.Completed -> "Published!"
