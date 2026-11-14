@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class OmniSessionManager(
-    private val context: Context
+    context: Context
 ) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -30,7 +30,8 @@ class OmniSessionManager(
     private val _isLoggedIn = MutableStateFlow(auth.currentUser != null)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    private val _jwtToken = MutableStateFlow<String?>(prefs.getString("jwt_token", null))
+    // Firebase ID tokens stay in memory only. Firebase Auth refreshes them when needed.
+    private val _jwtToken = MutableStateFlow<String?>(null)
     val jwtToken: StateFlow<String?> = _jwtToken.asStateFlow()
 
     private val _sessionStatus = MutableStateFlow("Initialized")
@@ -42,44 +43,35 @@ class OmniSessionManager(
             _currentUser.value = user
             _isLoggedIn.value = user != null
             if (user != null) {
-                scope.launch {
-                    refreshJwtToken(false)
-                }
+                scope.launch { refreshJwtToken(false) }
             } else {
                 clearCachedSession()
             }
         }
 
-        // Check if user was already cached or auto-refresh
         if (auth.currentUser != null) {
-            scope.launch {
-                refreshJwtToken(false)
-            }
+            scope.launch { refreshJwtToken(false) }
         }
     }
 
     /**
-     * Refreshes JWT token from Firebase Auth and persists it to secure preferences.
+     * Gets a Firebase ID token for authenticated API requests.
+     * The token is held in memory only and is never written to SharedPreferences.
      */
     suspend fun refreshJwtToken(forceRefresh: Boolean = false): String? {
         val user = auth.currentUser ?: return null
         return try {
-            val tokenResult = user.getIdToken(forceRefresh).await()
-            val token = tokenResult.token
+            val token = user.getIdToken(forceRefresh).await().token
             if (!token.isNullOrBlank()) {
                 _jwtToken.value = token
-                _sessionStatus.value = "Verified Cloud JWT Active"
-                prefs.edit()
-                    .putString("jwt_token", token)
-                    .putString("user_uid", user.uid)
-                    .putString("user_email", user.email ?: "")
-                    .putLong("last_token_refresh", System.currentTimeMillis())
-                    .apply()
+                _sessionStatus.value = "Firebase ID token ready"
             }
             token
         } catch (e: Exception) {
-            Log.w("OmniSession", "Could not refresh JWT token: ${e.message}")
-            prefs.getString("jwt_token", null)
+            Log.w("OmniSession", "Could not refresh Firebase ID token: ${e.message}")
+            _jwtToken.value = null
+            _sessionStatus.value = "Token refresh failed"
+            null
         }
     }
 
