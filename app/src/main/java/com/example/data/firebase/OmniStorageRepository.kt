@@ -259,4 +259,54 @@ class OmniStorageRepository(
         }
     }
 
+    /** Uploads a story to Cloudinary with a signed 24-hour public-access window. */
+    fun uploadAndPublishStory(
+        mediaUri: Uri,
+        isVideo: Boolean,
+        caption: String,
+        authorHandle: String,
+        authorName: String,
+        authorAvatar: String
+    ): Flow<MediaPipelineResult> = callbackFlow {
+        try {
+            val uid = requireUserId()
+            trySend(MediaPipelineResult.Uploading(0))
+            val uploaded = CloudinaryUploadRepository(context, auth).upload(
+                uri = mediaUri,
+                isVideo = isVideo,
+                purpose = "story",
+                onProgress = { percent -> trySend(MediaPipelineResult.Uploading(percent)) }
+            )
+            val expirySeconds = uploaded.expiresAt
+                ?: throw IllegalStateException("The media service did not return a story expiry time")
+            trySend(MediaPipelineResult.SavingToFirestore)
+            val story = com.example.data.model.OmniStoryDocument(
+                uid = uid,
+                authorName = authorName,
+                authorAvatarUrl = authorAvatar,
+                authorHandle = authorHandle,
+                mediaUrl = uploaded.secureUrl,
+                mediaType = if (isVideo) "video" else "photo",
+                thumbnailUrl = uploaded.thumbnailUrl,
+                cloudinaryPublicId = uploaded.publicId,
+                caption = caption,
+                durationSeconds = uploaded.durationSeconds,
+                expiresAt = com.google.firebase.Timestamp(java.util.Date(expirySeconds * 1000L))
+            )
+            val saved = firestoreRepository.createStory(story)
+            if (saved.isSuccess) {
+                trySend(MediaPipelineResult.Success(saved.getOrThrow(), uploaded.secureUrl))
+            } else {
+                trySend(MediaPipelineResult.Failed(saved.exceptionOrNull()?.localizedMessage ?: "Story uploaded, but its record could not be saved"))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("OmniStorage", "Cloudinary story pipeline failed: ${e.message}", e)
+            trySend(MediaPipelineResult.Failed(e.localizedMessage ?: "Story upload failed"))
+        } finally {
+            close()
+        }
+    }
+
 }
