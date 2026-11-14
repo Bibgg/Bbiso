@@ -145,12 +145,13 @@ fun MediaUploadScreen(
     onPostCreated: (PostFormat, String?, String, Uri, Boolean, Boolean, List<String>) -> Unit,
     isUploading: Boolean = false,
     uploadProgressPercent: Int? = null,
+    initialCategory: UploadCategory = UploadCategory.TUBE,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var selectedCategory by remember { mutableStateOf(UploadCategory.TUBE) }
+    var selectedCategory by remember { mutableStateOf(initialCategory) }
     var selectedMediaUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     var titleText by remember { mutableStateOf("") }
