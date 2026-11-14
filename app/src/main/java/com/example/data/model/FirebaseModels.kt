@@ -109,6 +109,47 @@ data class OmniPostDocument(
 }
 
 @IgnoreExtraProperties
+data class OmniStoryDocument(
+    @DocumentId val storyId: String = "",
+    val uid: String = "",
+    val authorName: String = "",
+    val authorAvatarUrl: String = "",
+    val authorHandle: String = "",
+    val mediaUrl: String = "",
+    val mediaType: String = "photo",
+    val thumbnailUrl: String = "",
+    val cloudinaryPublicId: String = "",
+    val caption: String = "",
+    val durationSeconds: Double? = null,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    val expiresAt: Timestamp? = null
+) {
+    fun toStoryItem(): StoryItem {
+        val created = createdAt?.toDate()?.time
+        val timestampLabel = if (created == null) "Just now" else {
+            val minutes = ((System.currentTimeMillis() - created).coerceAtLeast(0L) / 60_000L).toInt()
+            if (minutes < 1) "Just now" else if (minutes < 60) "${minutes}m ago" else "${minutes / 60}h ago"
+        }
+        return StoryItem(
+            id = storyId,
+            user = User(
+                id = uid,
+                username = if (authorHandle.startsWith("@")) authorHandle else "@$authorHandle",
+                displayName = authorName.ifBlank { authorHandle.ifBlank { "Bbiso User" } },
+                avatarUrl = authorAvatarUrl
+            ),
+            previewImage = thumbnailUrl.ifBlank { mediaUrl },
+            caption = caption,
+            timestamp = timestampLabel,
+            mediaUrl = mediaUrl,
+            isVideo = mediaType == "video",
+            durationSeconds = durationSeconds,
+            expiresAt = expiresAt?.toDate()?.time
+        )
+    }
+}
+
+@IgnoreExtraProperties
 data class OmniChatDocument(
     @DocumentId val chatId: String = "",
     val participants: List<String> = emptyList(),
