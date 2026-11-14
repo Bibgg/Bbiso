@@ -67,6 +67,7 @@ data class OmniPostDocument(
     val cloudinaryPublicId: String = "",
     val mediaBytes: Long = 0L,
     val durationSeconds: Double? = null,
+    val tags: List<String> = emptyList(),
     val caption: String = "",
     val title: String = "",
     val format: String = "SNAP", // "TUBE", "SNAP", "CHATTER", "FORUM"
@@ -97,6 +98,7 @@ data class OmniPostDocument(
             title = title.ifBlank { null },
             body = caption,
             mediaUrls = if (mediaUrl.isNotBlank()) listOf(mediaUrl) else emptyList(),
+            tags = tags,
             likeCount = likesCount.toInt(),
             commentCount = commentsCount.toInt(),
             repostCount = sharesCount.toInt(),
