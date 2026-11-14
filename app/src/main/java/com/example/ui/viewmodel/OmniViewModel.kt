@@ -308,6 +308,10 @@ class OmniViewModel @JvmOverloads constructor(
 
     fun openStory(story: StoryItem) {
         _activeStory.value = story
+        val currentUid = authRepository.getCurrentUser()?.uid
+        if (story.expiresAt != null && currentUid != null && currentUid != story.user.id) {
+            viewModelScope.launch { firestoreRepository.markStoryViewed(story.id) }
+        }
     }
 
     fun closeStory() {
