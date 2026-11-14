@@ -27,5 +27,8 @@ jobs:
       - name: Generate dependency lockfile
         run: npm install --package-lock-only --ignore-scripts --no-audit
 
+      - name: Run Cloudinary upload-signing unit tests
+        run: node --test backend/cloudinary-upload.test.js
+
       - name: Run production dependency audit
         run: npm audit --omit=dev
