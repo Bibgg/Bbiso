@@ -31,7 +31,8 @@ data class CloudinaryUploadResult(
     val thumbnailUrl: String,
     val bytes: Long,
     val format: String,
-    val durationSeconds: Double?
+    val durationSeconds: Double?,
+    val expiresAt: Long?
 )
 
 /**
@@ -80,6 +81,8 @@ class CloudinaryUploadRepository(
         val publicId = ticket.getString("publicId")
         val resourceType = ticket.getString("resourceType")
         val allowedFormats = ticket.getString("allowedFormats")
+        val accessControl = ticket.optString("accessControl")
+        val expiresAt = if (ticket.has("expiresAt") && !ticket.isNull("expiresAt")) ticket.getLong("expiresAt") else null
         val maxBytes = ticket.getLong("maxBytes")
 
         val fileSize = getFileSize(uri)
@@ -124,6 +127,7 @@ class CloudinaryUploadRepository(
             .addFormDataPart("folder", folder)
             .addFormDataPart("public_id", publicId)
             .addFormDataPart("allowed_formats", allowedFormats)
+            .apply { if (accessControl.isNotBlank()) addFormDataPart("access_control", accessControl) }
             .addFormDataPart("signature", signature)
             .build()
 
@@ -151,7 +155,8 @@ class CloudinaryUploadRepository(
             thumbnailUrl = thumbnail,
             bytes = uploaded.optLong("bytes", fileSize),
             format = uploaded.optString("format"),
-            durationSeconds = if (uploaded.has("duration")) uploaded.optDouble("duration") else null
+            durationSeconds = if (uploaded.has("duration")) uploaded.optDouble("duration") else null,
+            expiresAt = expiresAt
         )
     }
 
