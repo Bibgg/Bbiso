@@ -63,6 +63,10 @@ data class OmniPostDocument(
     val authorHandle: String = "",
     val mediaUrl: String = "",
     val mediaType: String = "photo", // "video", "photo", "none"
+    val thumbnailUrl: String = "",
+    val cloudinaryPublicId: String = "",
+    val mediaBytes: Long = 0L,
+    val durationSeconds: Double? = null,
     val caption: String = "",
     val title: String = "",
     val format: String = "SNAP", // "TUBE", "SNAP", "CHATTER", "FORUM"
