@@ -66,5 +66,9 @@ data class StoryItem(
     val previewImage: String,
     val caption: String = "",
     val hasUnseen: Boolean = true,
-    val timestamp: String = "3h ago"
+    val timestamp: String = "3h ago",
+    val mediaUrl: String = "",
+    val isVideo: Boolean = false,
+    val durationSeconds: Double? = null,
+    val expiresAt: Long? = null
 )
