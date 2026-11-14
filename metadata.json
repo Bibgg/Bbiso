@@ -1,0 +1,8 @@
+{
+  "name": "Omni Social Box",
+  "description": "A unified social ecosystem merging video, photo, microblogging, and community forums into one seamless, high-performance Android experience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

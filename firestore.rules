@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.email.size() >= 3 &&
+             data.username is string &&
+             data.username.size() >= 3 &&
+             data.username.size() <= 30 &&
+             (!('full_name' in data) || data.full_name is string) &&
+             (!('display_name' in data) || data.display_name is string) &&
+             (!('dob' in data) || data.dob is string) &&
+             (!('avatar_url' in data) || data.avatar_url is string) &&
+             (!('bio' in data) || data.bio is string) &&
+             (!('phone_number' in data) || data.phone_number is string) &&
+             (!('phone_or_email' in data) || data.phone_or_email is string) &&
+             (!('private_account' in data) || data.private_account is bool);
+    }
+
+    function isValidPost(data) {
+      return data.postId is string &&
+             data.uid is string &&
+             data.uid == request.auth.uid &&
+             data.format in ['TUBE', 'SNAP', 'CHATTER', 'FORUM'] &&
+             (!('caption' in data) || data.caption is string) &&
+             (!('title' in data) || data.title is string) &&
+             (!('mediaUrl' in data) || data.mediaUrl is string) &&
+             (!('mediaType' in data) || data.mediaType in ['video', 'photo', 'none']) &&
+             (!('likesCount' in data) || data.likesCount is number) &&
+             (!('commentsCount' in data) || data.commentsCount is number) &&
+             (!('sharesCount' in data) || data.sharesCount is number);
+    }
+
+    function isValidChat(data) {
+      return data.chatId is string &&
+             data.participants is list &&
+             request.auth.uid in data.participants &&
+             data.participants.size() >= 2;
+    }
+
+    function isValidChatMessage(data, chatId) {
+      return data.messageId is string &&
+             data.chatId == chatId &&
+             data.senderUid == request.auth.uid &&
+             (!('text' in data) || data.text is string) &&
+             (!('mediaUrl' in data) || data.mediaUrl is string);
+    }
+
+    // User profile documents & user-specific anti-data-loss collections
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwner(userId);
+
+      // User likes backup
+      match /likes/{postId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User bookmarks backup
+      match /bookmarks/{postId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Username reservation index for atomic uniqueness checks
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.uid == request.auth.uid &&
+                       request.resource.data.username == username;
+      allow update, delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // Posts across feed formats
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.uid == request.auth.uid &&
+                       isValidPost(request.resource.data);
+      allow update: if isAuthenticated() && (
+                       resource.data.uid == request.auth.uid ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'sharesCount'])
+                    );
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // Chats and messaging
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && isValidChat(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow delete: if isAuthenticated() && request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() &&
+                       exists(/databases/$(database)/documents/chats/$(chatId)) &&
+                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isAuthenticated() &&
+                         exists(/databases/$(database)/documents/chats/$(chatId)) &&
+                         request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                         isValidChatMessage(request.resource.data, chatId);
+        allow update, delete: if isAuthenticated() && resource.data.senderUid == request.auth.uid;
+      }
+    }
+  }
+}

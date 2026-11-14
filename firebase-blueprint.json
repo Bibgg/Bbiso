@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with unique @handle, authentication metadata, and identity info",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth user identifier" },
+        "email": { "type": "string", "description": "User email address" },
+        "username": { "type": "string", "description": "Unique lowercase @handle" },
+        "full_name": { "type": "string", "description": "User display name" },
+        "dob": { "type": "string", "description": "Date of birth in YYYY-MM-DD format" },
+        "avatar_url": { "type": "string", "description": "URL to profile avatar image" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Account creation timestamp" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last profile update timestamp" }
+      },
+      "required": ["uid", "email", "username"]
+    },
+    "UsernameReservation": {
+      "title": "UsernameReservation",
+      "description": "Lookup document for atomic handle uniqueness verification",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner user UID" },
+        "username": { "type": "string", "description": "Unique reserved lowercase handle" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Reservation timestamp" }
+      },
+      "required": ["uid", "username"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social media post across Tube, Snap, Chatter, and Forum formats",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "Unique post identifier" },
+        "uid": { "type": "string", "description": "Author UID" },
+        "authorName": { "type": "string", "description": "Author display name" },
+        "authorAvatarUrl": { "type": "string", "description": "Author avatar URL" },
+        "authorHandle": { "type": "string", "description": "Author @handle" },
+        "mediaUrl": { "type": "string", "description": "Storage or CDN URL of media" },
+        "mediaType": { "type": "string", "enum": ["video", "photo", "none"], "description": "Type of attached media" },
+        "caption": { "type": "string", "description": "Post body or caption text" },
+        "title": { "type": "string", "description": "Optional title for Tube/Forum posts" },
+        "format": { "type": "string", "enum": ["TUBE", "SNAP", "CHATTER", "FORUM"], "description": "OmniBox feed format" },
+        "likesCount": { "type": "number", "description": "Total like count" },
+        "commentsCount": { "type": "number", "description": "Total comment count" },
+        "sharesCount": { "type": "number", "description": "Total share count" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Post publication timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last edit timestamp" }
+      },
+      "required": ["postId", "uid", "format"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Conversation between two or more users",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string", "description": "Unique chat room identifier" },
+        "participants": { "type": "array", "description": "List of participant user UIDs" },
+        "lastMessage": { "type": "string", "description": "Snippet of last message sent" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of most recent activity" }
+      },
+      "required": ["chatId", "participants"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Message inside a chat thread",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string", "description": "Unique message identifier" },
+        "chatId": { "type": "string", "description": "Parent chat identifier" },
+        "senderUid": { "type": "string", "description": "Sender user UID" },
+        "text": { "type": "string", "description": "Message text content" },
+        "mediaUrl": { "type": "string", "description": "Optional media attachment URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Message send timestamp" }
+      },
+      "required": ["messageId", "chatId", "senderUid"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents keyed by Firebase Auth UID"
+    },
+    "/usernames/{username}": {
+      "schema": "UsernameReservation",
+      "description": "Lookup index guaranteeing globally unique usernames"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Public social feed posts with owner-only mutation rules"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Direct message chat threads restricted to participant UIDs"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Thread messages restricted to chat participants with sender authorship enforcement"
+    }
+  }
+}

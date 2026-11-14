@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Omni Social Box</string>
+    <string name="tab_home">Home</string>
+    <string name="tab_tube">Tube</string>
+    <string name="tab_snap">Snap</string>
+    <string name="tab_chatter">Chatter</string>
+    <string name="tab_forum">Forum</string>
+    <string name="create_action">Create</string>
+</resources>
