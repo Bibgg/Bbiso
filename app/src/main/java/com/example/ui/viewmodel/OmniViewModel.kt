@@ -48,6 +48,7 @@ data class OmniUiState(
     val activeCommentPost: FeedPost? = null,
     val showCreateModal: Boolean = false,
     val showMediaUploadScreen: Boolean = false,
+    val isStoryUploadMode: Boolean = false,
     val showSoundLab: Boolean = false,
     val showAuthScreen: Boolean = false,
     val showSettingsScreen: Boolean = false,
@@ -80,6 +81,7 @@ class OmniViewModel @JvmOverloads constructor(
     private val _activeCommentPostId = MutableStateFlow<String?>(null)
     private val _showCreateModal = MutableStateFlow(false)
     private val _showMediaUploadScreen = MutableStateFlow(false)
+    private val _isStoryUploadMode = MutableStateFlow(false)
     private val _showSoundLab = MutableStateFlow(false)
     private val _showAuthScreen = MutableStateFlow(false)
     private val _showSettingsScreen = MutableStateFlow(false)
@@ -175,6 +177,7 @@ class OmniViewModel @JvmOverloads constructor(
         val commentPostId: String?,
         val showCreate: Boolean,
         val showMediaUpload: Boolean,
+        val isStoryUploadMode: Boolean,
         val showSoundLab: Boolean,
         val showAuth: Boolean,
         val showSettings: Boolean,
@@ -186,8 +189,8 @@ class OmniViewModel @JvmOverloads constructor(
     )
 
     private val _extraState = combine(
-        combine(_activeStory, _activeCommentPostId, _showCreateModal, _showMediaUploadScreen) { story, commentId, showCreate, showMedia ->
-            listOf(story, commentId, showCreate, showMedia)
+        combine(_activeStory, _activeCommentPostId, _showCreateModal, _showMediaUploadScreen, _isStoryUploadMode) { story, commentId, showCreate, showMedia, storyMode ->
+            listOf(story, commentId, showCreate, showMedia, storyMode)
         },
         combine(_showSoundLab, _showAuthScreen, _showSettingsScreen, _userProfile, sessionManager.isLoggedIn) { showLab, showAuth, showSettings, profile, loggedIn ->
             listOf(showLab, showAuth, showSettings, profile, loggedIn)
@@ -201,6 +204,7 @@ class OmniViewModel @JvmOverloads constructor(
             commentPostId = group1[1] as? String,
             showCreate = group1[2] as Boolean,
             showMediaUpload = group1[3] as Boolean,
+            isStoryUploadMode = group1[4] as Boolean,
             showSoundLab = group2[0] as Boolean,
             showAuth = group2[1] as Boolean,
             showSettings = group2[2] as Boolean,
@@ -240,6 +244,7 @@ class OmniViewModel @JvmOverloads constructor(
             activeCommentPost = activeCommentPost,
             showCreateModal = extra.showCreate,
             showMediaUploadScreen = extra.showMediaUpload,
+            isStoryUploadMode = extra.isStoryUploadMode,
             showSoundLab = extra.showSoundLab,
             showAuthScreen = extra.showAuth,
             showSettingsScreen = extra.showSettings,
@@ -349,15 +354,18 @@ class OmniViewModel @JvmOverloads constructor(
     }
 
     fun openMediaUploadScreen() {
+        _isStoryUploadMode.value = false
         _showMediaUploadScreen.value = true
     }
 
     fun openStoryUploadScreen() {
+        _isStoryUploadMode.value = true
         _showMediaUploadScreen.value = true
     }
 
     fun closeMediaUploadScreen() {
         _showMediaUploadScreen.value = false
+        _isStoryUploadMode.value = false
     }
 
     fun openSoundLab() {
@@ -516,6 +524,7 @@ class OmniViewModel @JvmOverloads constructor(
                             _isUploadingMedia.value = false
                             _uploadProgressPercent.value = null
                             _showMediaUploadScreen.value = false
+                            _isStoryUploadMode.value = false
                             _effects.emit(OmniEffect.ShowToast(if (isStory) "Story published and will expire after 24 hours." else "Media uploaded to Cloudinary and post saved to Firestore!"))
                         }
                         is MediaPipelineResult.Failed -> {
