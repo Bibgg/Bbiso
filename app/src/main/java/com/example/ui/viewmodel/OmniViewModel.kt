@@ -411,7 +411,8 @@ class OmniViewModel @JvmOverloads constructor(
                     mediaType = if (format == PostFormat.TUBE) "video" else if (mediaUrls.isNotEmpty()) "photo" else "none",
                     caption = body,
                     title = title ?: "",
-                    format = format.name
+                    format = format.name,
+                    tags = tags
                 )
                 firestoreRepository.createPost(postDoc)
                 _effects.emit(OmniEffect.ShowToast("Published & synced permanently to Cloud Firestore!"))
@@ -468,7 +469,7 @@ class OmniViewModel @JvmOverloads constructor(
                             _isUploadingMedia.value = false
                             _uploadProgressPercent.value = null
                             _showMediaUploadScreen.value = false
-                            _effects.emit(OmniEffect.ShowToast("4K Media uploaded to Cloud Storage & saved to Firestore!"))
+                            _effects.emit(OmniEffect.ShowToast("Media uploaded to Cloudinary and post saved to Firestore!"))
                         }
                         is MediaPipelineResult.Failed -> {
                             _isUploadingMedia.value = false
