@@ -63,6 +63,43 @@ service cloud.firestore {
              (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 2048));
     }
 
+    function isValidStory(data) {
+      return data.storyId is string &&
+             data.uid is string &&
+             data.uid == request.auth.uid &&
+             data.mediaUrl is string &&
+             data.mediaUrl.matches('https://.*') &&
+             data.mediaType in ['video', 'photo'] &&
+             data.expiresAt is timestamp &&
+             data.expiresAt > request.time &&
+             data.expiresAt <= request.time + duration.value(24, 'h') &&
+             (!('caption' in data) || (data.caption is string && data.caption.size() <= 2000)) &&
+             (!('thumbnailUrl' in data) || data.thumbnailUrl is string) &&
+             (!('cloudinaryPublicId' in data) || data.cloudinaryPublicId is string);
+    }
+
+    match /stories/{storyId} {
+      // Expired stories are never readable, even if a cleanup job has not removed the record yet.
+      allow read: if resource.data.expiresAt is timestamp && resource.data.expiresAt > request.time;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.storyId == storyId &&
+                       isValidStory(request.resource.data);
+      allow update: if false;
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+
+      match /views/{viewerUid} {
+        allow create: if isAuthenticated() &&
+                         viewerUid == request.auth.uid &&
+                         exists(/databases/$(database)/documents/stories/$(storyId)) &&
+                         get(/databases/$(database)/documents/stories/$(storyId)).data.expiresAt > request.time;
+        allow read: if isAuthenticated() &&
+                       exists(/databases/$(database)/documents/stories/$(storyId)) &&
+                       (get(/databases/$(database)/documents/stories/$(storyId)).data.uid == request.auth.uid ||
+                        viewerUid == request.auth.uid);
+        allow update, delete: if false;
+      }
+    }
+
     match /users/{userId} {
       // Profile data can include phone number and date of birth: require sign-in.
       allow read: if isAuthenticated();
