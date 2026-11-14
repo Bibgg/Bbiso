@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -97,7 +98,6 @@ import com.example.ui.theme.RepostGreen
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class UploadCategory(
@@ -142,10 +142,13 @@ sealed interface UploadPhase {
 @Composable
 fun MediaUploadScreen(
     onDismiss: () -> Unit,
-    onPostCreated: (PostFormat, String?, String, List<String>, List<String>) -> Unit,
+    onPostCreated: (PostFormat, String?, String, Uri, Boolean, List<String>) -> Unit,
+    isUploading: Boolean = false,
+    uploadProgressPercent: Int? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var selectedCategory by remember { mutableStateOf(UploadCategory.TUBE) }
     var selectedMediaUri by remember { mutableStateOf<Uri?>(null) }
@@ -804,47 +807,36 @@ fun MediaUploadScreen(
             }
 
             // 3. Upload Progress & State Card (YouTube/WhatsApp style)
-            AnimatedVisibility(visible = uploadPhase !is UploadPhase.Idle) {
-                UploadProgressOverlay(phase = uploadPhase)
+            AnimatedVisibility(visible = uploadPhase !is UploadPhase.Idle || isUploading) {
+                UploadProgressOverlay(phase = if (isUploading) UploadPhase.Uploading((uploadProgressPercent ?: 0) / 100f, 1, 1) else uploadPhase)
             }
 
             // 4. Primary Upload / Publish Button
             val isReady = selectedMediaUri != null &&
                     (selectedCategory != UploadCategory.TUBE || titleText.isNotBlank()) &&
-                    uploadPhase is UploadPhase.Idle
+                    uploadPhase is UploadPhase.Idle && !isUploading
 
             Button(
                 onClick = {
                     if (isReady) {
                         coroutineScope.launch {
-                            // Stage 1: Resumable chunked upload with percentage
-                            val totalChunks = 8
-                            for (chunk in 1..totalChunks) {
-                                val currentProgress = chunk.toFloat() / totalChunks
-                                uploadPhase = UploadPhase.Uploading(currentProgress, chunk, totalChunks)
-                                delay(250) // Simulate fast chunk streaming
-                            }
-
-                            // Stage 2: Serverless processing & HLS generation
-                            uploadPhase = UploadPhase.Processing("Extracting fast-start moov atom & HLS variants...")
-                            delay(600)
-                            uploadPhase = UploadPhase.Processing("Generating dynamic smart preview & CDN sync...")
-                            delay(500)
-
-                            // Stage 3: Completed
-                            uploadPhase = UploadPhase.Completed
-                            delay(400)
-
-                            // Finalize post into OmniBox Feed
+                            val uri = selectedMediaUri ?: return@launch
                             val tagsList = tagsText.split(",", " ")
                                 .map { it.trim().removePrefix("#") }
                                 .filter { it.isNotBlank() }
-                            val mediaUriString = selectedMediaUri.toString()
+                            val mimeType = context.contentResolver.getType(uri).orEmpty()
+                            val isVideo = mimeType.startsWith("video/")
+                            if (selectedCategory == UploadCategory.STORY) {
+                                uploadPhase = UploadPhase.Processing("Story publishing is being prepared")
+                                return@launch
+                            }
+                            uploadPhase = UploadPhase.Processing("Requesting secure upload permission...")
                             onPostCreated(
                                 selectedCategory.postFormat,
-                                if (selectedCategory == UploadCategory.TUBE) titleText else if (selectedCategory == UploadCategory.FILES) (titleText.ifBlank { selectedFileName ?: "Attached Document" }) else null,
-                                if (captionText.isNotBlank()) captionText else if (selectedCategory == UploadCategory.FILES) "Attached document: ${selectedFileName ?: "file"}" else "",
-                                listOf(mediaUriString),
+                                if (selectedCategory == UploadCategory.TUBE) titleText else if (selectedCategory == UploadCategory.FILES) (titleText.ifBlank { selectedFileName ?: "Attached File" }) else null,
+                                if (captionText.isNotBlank()) captionText else if (selectedCategory == UploadCategory.FILES) "Attached file: ${selectedFileName ?: "file"}" else "",
+                                uri,
+                                isVideo,
                                 tagsList
                             )
                         }
