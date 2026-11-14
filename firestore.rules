@@ -40,7 +40,7 @@ service cloud.firestore {
              (!('thumbnailUrl' in data) || data.thumbnailUrl is string) &&
              (!('cloudinaryPublicId' in data) || data.cloudinaryPublicId is string) &&
              (!('mediaBytes' in data) || data.mediaBytes is number) &&
-             (!('durationSeconds' in data) || data.durationSeconds is number) &&
+             (!('durationSeconds' in data) || data.durationSeconds == null || data.durationSeconds is number) &&
              (!('tags' in data) || (data.tags is list && data.tags.size() <= 10)) &&
              (!('likesCount' in data) || data.likesCount is number) &&
              (!('commentsCount' in data) || data.commentsCount is number) &&
