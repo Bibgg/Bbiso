@@ -90,6 +90,7 @@ service cloud.firestore {
       match /views/{viewerUid} {
         allow create: if isAuthenticated() &&
                          viewerUid == request.auth.uid &&
+                         request.resource.data.viewerUid == request.auth.uid &&
                          exists(/databases/$(database)/documents/stories/$(storyId)) &&
                          get(/databases/$(database)/documents/stories/$(storyId)).data.expiresAt > request.time;
         allow read: if isAuthenticated() &&
