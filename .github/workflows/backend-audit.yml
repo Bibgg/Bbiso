@@ -1,0 +1,31 @@
+name: Backend Dependency Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit Node.js production dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate dependency lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+
+      - name: Run production dependency audit
+        run: npm audit --omit=dev
