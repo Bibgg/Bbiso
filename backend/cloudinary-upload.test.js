@@ -47,6 +47,6 @@ test("story ticket signs a 24-hour public access window and uses the stories fol
   assert.equal(ticket.folder, "bbiso/users/firebase-user-123/stories");
   assert.equal(ticket.expiresAt, 1700086400);
   assert.ok(ticket.accessControl.includes('"access_type":"anonymous"'));
+  assert.ok(ticket.accessControl.includes("2023-11-14T22:13:20.000Z"));
   assert.ok(ticket.accessControl.includes("2023-11-15T22:13:20.000Z"));
-  assert.ok(ticket.accessControl.includes("2023-11-16T22:13:20.000Z"));
 });
