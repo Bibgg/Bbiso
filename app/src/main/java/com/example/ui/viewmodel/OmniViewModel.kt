@@ -454,7 +454,8 @@ class OmniViewModel @JvmOverloads constructor(
                     caption = caption,
                     authorHandle = authorHandle,
                     authorName = authorName,
-                    authorAvatar = authorAvatar
+                    authorAvatar = authorAvatar,
+                    tags = tags
                 ).collect { result ->
                     when (result) {
                         is MediaPipelineResult.Uploading -> {
@@ -478,11 +479,10 @@ class OmniViewModel @JvmOverloads constructor(
                     }
                 }
             } else {
-                // Fallback to standard creation
-                createNewPost(format, title, caption, if (mediaUri != null) listOf(mediaUri.toString()) else emptyList(), null, tags)
                 _isUploadingMedia.value = false
                 _uploadProgressPercent.value = null
-                _showMediaUploadScreen.value = false
+                _effects.emit(OmniEffect.ShowToast("Please sign in before publishing photos or videos."))
+                _showAuthScreen.value = true
             }
         }
     }
