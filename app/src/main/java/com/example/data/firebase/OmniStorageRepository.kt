@@ -194,95 +194,66 @@ class OmniStorageRepository(
         authorName: String,
         authorAvatar: String
     ): Flow<MediaPipelineResult> = callbackFlow {
-        val uid = try {
-            requireUserId()
-        } catch (e: Exception) {
-            trySend(MediaPipelineResult.Failed(e.localizedMessage ?: "Authentication required"))
-            close()
-            return@callbackFlow
-        }
-
-        if (mediaUri == null) {
-            // Text-only post
-            trySend(MediaPipelineResult.SavingToFirestore)
-            val postDoc = OmniPostDocument(
-                uid = uid,
-                authorName = authorName,
-                authorAvatarUrl = authorAvatar,
-                authorHandle = authorHandle,
-                mediaUrl = "",
-                mediaType = "none",
-                caption = caption,
-                title = title ?: "",
-                format = format.name
-            )
-            val result = firestoreRepository.createPost(postDoc)
-            if (result.isSuccess) {
-                trySend(MediaPipelineResult.Success(result.getOrThrow(), ""))
-            } else {
-                trySend(MediaPipelineResult.Failed(result.exceptionOrNull()?.message ?: "Failed to save post"))
-            }
-            close()
-            return@callbackFlow
-        }
-
-        // Upload media first with progress
-        val folder = if (isVideo) "users/$uid/videos" else "users/$uid/photos"
-        val extension = if (isVideo) "mp4" else "jpg"
-        val uniqueName = "${System.currentTimeMillis()}_${UUID.randomUUID()}.$extension"
-        val storageRef = storage.reference.child("$folder/$uniqueName")
-
-        val metadata = StorageMetadata.Builder()
-            .setContentType(if (isVideo) "video/mp4" else "image/jpeg")
-            .setCustomMetadata("uploadedBy", uid)
-            .build()
-
-        val uploadTask = storageRef.putFile(mediaUri, metadata)
-
-        uploadTask.addOnProgressListener { snapshot ->
-            val total = snapshot.totalByteCount
-            val transferred = snapshot.bytesTransferred
-            val percent = if (total > 0) ((transferred * 100) / total).toInt() else 0
-            trySend(MediaPipelineResult.Uploading(percent))
-        }.addOnSuccessListener {
-            trySend(MediaPipelineResult.SavingToFirestore)
-            storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                val permanentUrl = downloadUri.toString()
-                val postDoc = OmniPostDocument(
+        try {
+            val uid = requireUserId()
+            if (mediaUri == null) {
+                trySend(MediaPipelineResult.SavingToFirestore)
+                val textPost = OmniPostDocument(
                     uid = uid,
                     authorName = authorName,
                     authorAvatarUrl = authorAvatar,
                     authorHandle = authorHandle,
-                    mediaUrl = permanentUrl,
-                    mediaType = if (isVideo) "video" else "photo",
+                    mediaUrl = "",
+                    mediaType = "none",
                     caption = caption,
                     title = title ?: "",
                     format = format.name
                 )
-                // Save into Firestore
-                storageRef.storage.app // verify storage
-                CoroutineScope(Dispatchers.IO).launch {
-                    val createResult = firestoreRepository.createPost(postDoc)
-                    if (createResult.isSuccess) {
-                        trySend(MediaPipelineResult.Success(createResult.getOrThrow(), permanentUrl))
-                    } else {
-                        trySend(MediaPipelineResult.Failed(createResult.exceptionOrNull()?.message ?: "Failed to save post in Firestore"))
-                    }
-                    close()
+                val saved = firestoreRepository.createPost(textPost)
+                if (saved.isSuccess) {
+                    trySend(MediaPipelineResult.Success(saved.getOrThrow(), ""))
+                } else {
+                    trySend(MediaPipelineResult.Failed(saved.exceptionOrNull()?.localizedMessage ?: "Could not publish post"))
                 }
-            }.addOnFailureListener { error ->
-                trySend(MediaPipelineResult.Failed("Failed to get download URL: ${error.message}"))
-                close(error)
+            } else {
+                trySend(MediaPipelineResult.Uploading(0))
+                val uploaded = CloudinaryUploadRepository(context, auth).upload(
+                    uri = mediaUri,
+                    isVideo = isVideo,
+                    purpose = "post",
+                    onProgress = { percent -> trySend(MediaPipelineResult.Uploading(percent)) }
+                )
+                trySend(MediaPipelineResult.SavingToFirestore)
+                val post = OmniPostDocument(
+                    uid = uid,
+                    authorName = authorName,
+                    authorAvatarUrl = authorAvatar,
+                    authorHandle = authorHandle,
+                    mediaUrl = uploaded.secureUrl,
+                    mediaType = if (isVideo) "video" else "photo",
+                    thumbnailUrl = uploaded.thumbnailUrl,
+                    cloudinaryPublicId = uploaded.publicId,
+                    mediaBytes = uploaded.bytes,
+                    durationSeconds = uploaded.durationSeconds,
+                    caption = caption,
+                    title = title ?: "",
+                    format = format.name
+                )
+                val saved = firestoreRepository.createPost(post)
+                if (saved.isSuccess) {
+                    trySend(MediaPipelineResult.Success(saved.getOrThrow(), uploaded.secureUrl))
+                } else {
+                    trySend(MediaPipelineResult.Failed(saved.exceptionOrNull()?.localizedMessage ?: "Media uploaded, but post metadata could not be saved"))
+                }
             }
-        }.addOnFailureListener { error ->
-            trySend(MediaPipelineResult.Failed("Cloud Storage upload failed: ${error.message}"))
-            close(error)
-        }
-
-        awaitClose {
-            if (uploadTask.isInProgress) {
-                uploadTask.cancel()
-            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("OmniStorage", "Cloudinary media pipeline failed: ${e.message}", e)
+            trySend(MediaPipelineResult.Failed(e.localizedMessage ?: "Media upload failed"))
+        } finally {
+            close()
         }
     }
+
 }
