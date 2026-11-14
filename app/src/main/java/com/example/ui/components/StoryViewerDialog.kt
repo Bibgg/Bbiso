@@ -50,6 +50,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.data.model.StoryItem
+import com.example.ui.components.OmniInlineVideoPlayer
 import com.example.ui.components.audio.AudioSpectrumVisualizer
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.DarkBorder
@@ -67,18 +68,19 @@ fun StoryViewerDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var progressStarted by remember { mutableStateOf(false) }
+    var progressStarted by remember(story.id) { mutableStateOf(false) }
+    val storyDurationMs = ((story.durationSeconds?.times(1000.0)?.toLong()) ?: if (story.isVideo) 15000L else 5000L).coerceIn(5000L, 30000L)
     var replyText by remember { mutableStateOf("") }
 
     val progress by animateFloatAsState(
         targetValue = if (progressStarted) 1f else 0f,
-        animationSpec = tween(durationMillis = 5000, easing = LinearEasing),
+        animationSpec = tween(durationMillis = storyDurationMs.toInt(), easing = LinearEasing),
         label = "storyTimer"
     )
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(story.id) {
         progressStarted = true
-        delay(5000)
+        delay(storyDurationMs)
         onDismiss()
     }
 
@@ -94,13 +96,26 @@ fun StoryViewerDialog(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Fullscreen story background
-            AsyncImage(
-                model = story.previewImage,
-                contentDescription = story.caption,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            // Fullscreen story background: videos play from Cloudinary; photos use the thumbnail.
+            if (story.isVideo && story.mediaUrl.isNotBlank()) {
+                OmniInlineVideoPlayer(
+                    videoUrl = story.mediaUrl,
+                    thumbnailUrl = story.previewImage,
+                    isPlaying = true,
+                    isMuted = true,
+                    onTogglePlay = {},
+                    onToggleMute = {},
+                    modifier = Modifier.fillMaxSize(),
+                    isControlsVisible = false
+                )
+            } else {
+                AsyncImage(
+                    model = story.previewImage,
+                    contentDescription = story.caption,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             // Top gradient for status bar and header visibility
             Box(
