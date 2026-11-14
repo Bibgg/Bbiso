@@ -14,6 +14,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
+import okhttp3.Call
+import okhttp3.Callback
+import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okio.BufferedSink
 import org.json.JSONObject
 import java.io.IOException
@@ -65,7 +71,7 @@ class CloudinaryUploadRepository(
             .post(RequestBody.create("application/json".toMediaTypeOrNull(), ticketJson.toString()))
             .build()
 
-        val ticket = executeJson(ticketRequest, "Could not prepare secure media upload")
+        val ticket = executeJsonSuspend(ticketRequest, "Could not prepare secure media upload")
         val cloudName = ticket.getString("cloudName")
         val apiKey = ticket.getString("apiKey")
         val timestamp = ticket.getLong("timestamp")
@@ -123,11 +129,11 @@ class CloudinaryUploadRepository(
 
         val uploadUrl = "https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload"
         val uploadRequest = Request.Builder().url(uploadUrl).post(multipart).build()
-        val uploaded = executeJson(uploadRequest, "Cloudinary upload failed")
+        val uploaded = executeJsonSuspend(uploadRequest, "Cloudinary upload failed")
 
         val secureUrl = uploaded.optString("secure_url")
         val returnedPublicId = uploaded.optString("public_id")
-        if (!secureUrl.startsWith("https://") || returnedPublicId != publicId) {
+        if (!secureUrl.startsWith("https://") || !(returnedPublicId == publicId || returnedPublicId.endsWith("/$publicId"))) {
             throw IOException("Cloudinary returned an invalid media response")
         }
 
@@ -149,20 +155,35 @@ class CloudinaryUploadRepository(
         )
     }
 
-    private fun executeJson(request: Request, fallbackMessage: String): JSONObject {
-        val response: Response = client.newCall(request).execute()
-        response.use {
-            val raw = it.body?.string().orEmpty()
-            if (!it.isSuccessful) {
-                val message = try { JSONObject(raw).optString("error").ifBlank { fallbackMessage } }
-                    catch (_: Exception) { fallbackMessage }
-                throw IOException(message)
-            }
-            return try { JSONObject(raw) } catch (_: Exception) {
-                throw IOException("The media service returned an invalid response")
-            }
+    private suspend fun executeJsonSuspend(request: Request, fallbackMessage: String): JSONObject =
+        suspendCancellableCoroutine { continuation ->
+            val call: Call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        try {
+                            val raw = it.body?.string().orEmpty()
+                            if (!it.isSuccessful) {
+                                val message = try { JSONObject(raw).optString("error").ifBlank { fallbackMessage } }
+                                    catch (_: Exception) { fallbackMessage }
+                                throw IOException(message)
+                            }
+                            val json = try { JSONObject(raw) } catch (_: Exception) {
+                                throw IOException("The media service returned an invalid response")
+                            }
+                            if (continuation.isActive) continuation.resume(json)
+                        } catch (error: Exception) {
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                        }
+                    }
+                }
+            })
         }
-    }
 
     private fun getFileSize(uri: Uri): Long {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor: Cursor ->
