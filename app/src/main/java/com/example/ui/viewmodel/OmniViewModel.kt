@@ -352,6 +352,10 @@ class OmniViewModel @JvmOverloads constructor(
         _showMediaUploadScreen.value = true
     }
 
+    fun openStoryUploadScreen() {
+        _showMediaUploadScreen.value = true
+    }
+
     fun closeMediaUploadScreen() {
         _showMediaUploadScreen.value = false
     }
