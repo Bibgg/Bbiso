@@ -34,4 +34,4 @@ jobs:
         run: npm install --no-save firebase-tools @firebase/rules-unit-testing firebase
 
       - name: Run Firestore security tests
-        run: npx firebase emulators:exec --only firestore --project demo-no-project "node --test firestore.test.js"
+        run: npx firebase emulators:exec --only firestore,storage --project demo-no-project "node --test firestore.test.js storage.test.js"
