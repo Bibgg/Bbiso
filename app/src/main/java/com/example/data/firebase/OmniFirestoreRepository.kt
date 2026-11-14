@@ -5,6 +5,7 @@ import com.example.R
 import com.example.data.model.OmniChatDocument
 import com.example.data.model.OmniChatMessageDocument
 import com.example.data.model.OmniPostDocument
+import com.example.data.model.OmniStoryDocument
 import com.example.data.model.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -113,6 +114,39 @@ class OmniFirestoreRepository(
                 emit(emptyList())
             }
             .flowOn(Dispatchers.IO)
+    }
+
+    /** Observe only stories whose 24-hour visibility window has not expired. */
+    fun observeStories(): Flow<List<OmniStoryDocument>> {
+        return db.collection("stories")
+            .whereGreaterThan("expiresAt", com.google.firebase.Timestamp.now())
+            .snapshots()
+            .map { snapshot ->
+                snapshot.documents.mapNotNull { it.toObject(OmniStoryDocument::class.java) }
+                    .filter { it.expiresAt?.toDate()?.time?.let { expiry -> expiry > System.currentTimeMillis() } == true }
+                    .sortedByDescending { it.createdAt?.toDate()?.time ?: 0L }
+            }
+            .catch { e ->
+                if (e is Exception) handleFirestoreError(e, OperationType.LIST, "stories")
+                emit(emptyList())
+            }
+            .flowOn(Dispatchers.IO)
+    }
+
+    /** Publish a story document after Cloudinary confirms the media upload. */
+    suspend fun createStory(story: OmniStoryDocument): Result<String> {
+        val uid = requireUserId()
+        val storiesRef = db.collection("stories")
+        val newDocRef = if (story.storyId.isNotBlank()) storiesRef.document(story.storyId) else storiesRef.document()
+        return try {
+            newDocRef.set(story.copy(storyId = newDocRef.id, uid = uid)).await()
+            Result.success(newDocRef.id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, newDocRef.path)
+            Result.failure(e)
+        }
     }
 
     /**
