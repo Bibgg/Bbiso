@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 enum class OmniTab {
     HOME,
@@ -85,6 +87,7 @@ class OmniViewModel @JvmOverloads constructor(
 
     private val _cloudPosts = MutableStateFlow<List<FeedPost>>(emptyList())
     private val _cloudStories = MutableStateFlow<List<StoryItem>>(emptyList())
+    private val _storyClock = MutableStateFlow(System.currentTimeMillis())
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     private val _userLikedPostIds = MutableStateFlow<Set<String>>(emptySet())
     private val _userBookmarkedPostIds = MutableStateFlow<Set<String>>(emptySet())
@@ -95,6 +98,14 @@ class OmniViewModel @JvmOverloads constructor(
     val effects: SharedFlow<OmniEffect> = _effects.asSharedFlow()
 
     init {
+        // Refresh story expiry visibility while the app remains open.
+        viewModelScope.launch {
+            while (isActive) {
+                delay(60_000)
+                _storyClock.value = System.currentTimeMillis()
+            }
+        }
+
         // Observe Firebase Auth changes and sync profile and likes/bookmarks from Firestore
         viewModelScope.launch {
             sessionManager.currentUser.collect { firebaseUser ->
@@ -201,8 +212,11 @@ class OmniViewModel @JvmOverloads constructor(
         )
     }
 
-    private val _feedData = combine(repository.postsFlow, _cloudPosts, repository.storiesFlow, _cloudStories) { localPosts, cloudPosts, localStories, cloudStories ->
-        Triple(localPosts, cloudPosts, (cloudStories + localStories).distinctBy { it.id })
+    private val _feedData = combine(repository.postsFlow, _cloudPosts, repository.storiesFlow, _cloudStories, _storyClock) { localPosts, cloudPosts, localStories, cloudStories, now ->
+        val activeStories = (cloudStories + localStories)
+            .filter { it.expiresAt == null || it.expiresAt > now }
+            .distinctBy { it.id }
+        Triple(localPosts, cloudPosts, activeStories)
     }
 
     val uiState: StateFlow<OmniUiState> = combine(
