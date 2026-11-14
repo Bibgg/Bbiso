@@ -44,6 +44,7 @@ import com.example.ui.screens.ChatterScreen
 import com.example.ui.screens.ForumScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MediaUploadScreen
+import com.example.ui.screens.VideoCreatorStudioScreen
 import com.example.ui.screens.UploadCategory
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SettingsScreen
@@ -247,23 +248,42 @@ class MainActivity : ComponentActivity() {
 
                 // Studio Media Upload Screen (Full native picker, preview & chunk progress)
                 if (uiState.showMediaUploadScreen) {
-                    MediaUploadScreen(
-                        onDismiss = { viewModel.closeMediaUploadScreen() },
-                        isUploading = uiState.isUploadingMedia,
-                        uploadProgressPercent = uiState.uploadProgressPercent,
-                        initialCategory = if (uiState.isStoryUploadMode) UploadCategory.STORY else UploadCategory.TUBE,
-                        onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
-                            viewModel.uploadMediaAndPublish(
-                                mediaUri = mediaUri,
-                                isVideo = isVideo,
-                                format = format,
-                                title = title,
-                                caption = body,
-                                tags = tags,
-                                isStory = isStory
-                            )
-                        }
-                    )
+                    if (uiState.isStoryUploadMode) {
+                        MediaUploadScreen(
+                            onDismiss = { viewModel.closeMediaUploadScreen() },
+                            isUploading = uiState.isUploadingMedia,
+                            uploadProgressPercent = uiState.uploadProgressPercent,
+                            initialCategory = UploadCategory.STORY,
+                            onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
+                                viewModel.uploadMediaAndPublish(
+                                    mediaUri = mediaUri,
+                                    isVideo = isVideo,
+                                    format = format,
+                                    title = title,
+                                    caption = body,
+                                    tags = tags,
+                                    isStory = isStory
+                                )
+                            }
+                        )
+                    } else {
+                        VideoCreatorStudioScreen(
+                            onDismiss = { viewModel.closeMediaUploadScreen() },
+                            isUploading = uiState.isUploadingMedia,
+                            uploadProgressPercent = uiState.uploadProgressPercent,
+                            onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
+                                viewModel.uploadMediaAndPublish(
+                                    mediaUri = mediaUri,
+                                    isVideo = isVideo,
+                                    format = format,
+                                    title = title,
+                                    caption = body,
+                                    tags = tags,
+                                    isStory = isStory
+                                )
+                            }
+                        )
+                    }
                 }
 
                 // Fullscreen Story Viewer
