@@ -192,7 +192,8 @@ class OmniStorageRepository(
         caption: String,
         authorHandle: String,
         authorName: String,
-        authorAvatar: String
+        authorAvatar: String,
+        tags: List<String> = emptyList()
     ): Flow<MediaPipelineResult> = callbackFlow {
         try {
             val uid = requireUserId()
@@ -207,7 +208,8 @@ class OmniStorageRepository(
                     mediaType = "none",
                     caption = caption,
                     title = title ?: "",
-                    format = format.name
+                    format = format.name,
+                    tags = tags
                 )
                 val saved = firestoreRepository.createPost(textPost)
                 if (saved.isSuccess) {
@@ -237,7 +239,8 @@ class OmniStorageRepository(
                     durationSeconds = uploaded.durationSeconds,
                     caption = caption,
                     title = title ?: "",
-                    format = format.name
+                    format = format.name,
+                    tags = tags
                 )
                 val saved = firestoreRepository.createPost(post)
                 if (saved.isSuccess) {
