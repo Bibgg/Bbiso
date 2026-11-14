@@ -167,7 +167,7 @@ app.post("/api/media/upload-signature", requireFirebaseAuth(process.env.FIREBASE
   }
 });
 
-app.post("/api/media/verify-upload", requireFirebaseAuth(process.env.FIREBASE_PROJECT_ID), async (req, res) => {
+app.post("/api/media/verify-upload", rateLimit({ windowMs: 60 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false }), requireFirebaseAuth(process.env.FIREBASE_PROJECT_ID), async (req, res) => {
   const schema = z.object({
     mediaType: z.enum(["video", "image"]),
     purpose: z.enum(["post", "story"]),
