@@ -28,12 +28,17 @@ function createUploadTicket({ uid, mediaType, purpose, env = process.env, now = 
   if (!["video", "image"].includes(mediaType)) throw new Error("mediaType must be video or image");
   if (!["post", "story"].includes(purpose)) throw new Error("purpose must be post or story");
 
-  const timestamp = Math.floor(now() / 1000);
+  const nowMs = now();
+  const timestamp = Math.floor(nowMs / 1000);
   const folder = `bbiso/users/${uid}/${purpose === "story" ? "stories" : "posts"}`;
   const publicId = uuid();
   const allowedFormats = mediaType === "video" ? VIDEO_FORMATS : IMAGE_FORMATS;
   const resourceType = mediaType === "video" ? "video" : "image";
+  const accessControl = purpose === "story"
+    ? JSON.stringify([{ access_type: "anonymous", start: new Date(nowMs).toISOString(), end: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString() }])
+    : "";
   const parameters = { folder, public_id: publicId, timestamp, allowed_formats: allowedFormats };
+  if (accessControl) parameters.access_control = accessControl;
 
   return {
     cloudName,
@@ -44,6 +49,8 @@ function createUploadTicket({ uid, mediaType, purpose, env = process.env, now = 
     publicId,
     resourceType,
     allowedFormats,
+    accessControl,
+    expiresAt: purpose === "story" ? timestamp + 24 * 60 * 60 : null,
     maxBytes: mediaType === "video" ? VIDEO_MAX_BYTES : IMAGE_MAX_BYTES
   };
 }
