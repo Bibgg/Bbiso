@@ -34,3 +34,19 @@ test("upload ticket rejects invalid media types, purposes and missing credential
   assert.throws(() => createUploadTicket({ uid: "u1", mediaType: "image", purpose: "profile", env }));
   assert.throws(() => createUploadTicket({ uid: "u1", mediaType: "image", purpose: "post", env: {} }), { code: "CLOUDINARY_NOT_CONFIGURED" });
 });
+
+test("story ticket signs a 24-hour public access window and uses the stories folder", () => {
+  const ticket = createUploadTicket({
+    uid: "firebase-user-123",
+    mediaType: "image",
+    purpose: "story",
+    env: { CLOUDINARY_CLOUD_NAME: "demo-cloud", CLOUDINARY_API_KEY: "12345", CLOUDINARY_API_SECRET: "secret" },
+    now: () => 1700000000000,
+    uuid: () => "story-asset-id"
+  });
+  assert.equal(ticket.folder, "bbiso/users/firebase-user-123/stories");
+  assert.equal(ticket.expiresAt, 1700086400);
+  assert.ok(ticket.accessControl.includes('"access_type":"anonymous"'));
+  assert.ok(ticket.accessControl.includes("2023-11-15T22:13:20.000Z"));
+  assert.ok(ticket.accessControl.includes("2023-11-16T22:13:20.000Z"));
+});
