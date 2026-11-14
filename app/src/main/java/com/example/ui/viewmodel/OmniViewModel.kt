@@ -84,6 +84,7 @@ class OmniViewModel @JvmOverloads constructor(
     private val _forumSort = MutableStateFlow("Hot")
 
     private val _cloudPosts = MutableStateFlow<List<FeedPost>>(emptyList())
+    private val _cloudStories = MutableStateFlow<List<StoryItem>>(emptyList())
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     private val _userLikedPostIds = MutableStateFlow<Set<String>>(emptySet())
     private val _userBookmarkedPostIds = MutableStateFlow<Set<String>>(emptySet())
@@ -131,6 +132,17 @@ class OmniViewModel @JvmOverloads constructor(
                         } catch (e: Exception) {}
                     }
                 }
+            }
+        }
+
+        // Real-time listener for active Firestore stories (Cloudinary media expires after 24 hours).
+        viewModelScope.launch {
+            try {
+                firestoreRepository.observeStories().collect { storyDocs ->
+                    _cloudStories.value = storyDocs.map { it.toStoryItem() }
+                }
+            } catch (_: Exception) {
+                _cloudStories.value = emptyList()
             }
         }
 
@@ -189,8 +201,8 @@ class OmniViewModel @JvmOverloads constructor(
         )
     }
 
-    private val _feedData = combine(repository.postsFlow, _cloudPosts, repository.storiesFlow) { localPosts, cloudPosts, stories ->
-        Triple(localPosts, cloudPosts, stories)
+    private val _feedData = combine(repository.postsFlow, _cloudPosts, repository.storiesFlow, _cloudStories) { localPosts, cloudPosts, localStories, cloudStories ->
+        Triple(localPosts, cloudPosts, (cloudStories + localStories).distinctBy { it.id })
     }
 
     val uiState: StateFlow<OmniUiState> = combine(
@@ -434,7 +446,8 @@ class OmniViewModel @JvmOverloads constructor(
         format: PostFormat,
         title: String?,
         caption: String,
-        tags: List<String>
+        tags: List<String>,
+        isStory: Boolean = false
     ) {
         _isUploadingMedia.value = true
         _uploadProgressPercent.value = 0
@@ -447,17 +460,29 @@ class OmniViewModel @JvmOverloads constructor(
 
         viewModelScope.launch {
             if (currentUser != null && mediaUri != null) {
-                storageRepository.uploadAndPublishPost(
-                    mediaUri = mediaUri,
-                    isVideo = isVideo,
-                    format = format,
-                    title = title,
-                    caption = caption,
-                    authorHandle = authorHandle,
-                    authorName = authorName,
-                    authorAvatar = authorAvatar,
-                    tags = tags
-                ).collect { result ->
+                val uploadFlow = if (isStory) {
+                    storageRepository.uploadAndPublishStory(
+                        mediaUri = mediaUri,
+                        isVideo = isVideo,
+                        caption = caption,
+                        authorHandle = authorHandle,
+                        authorName = authorName,
+                        authorAvatar = authorAvatar
+                    )
+                } else {
+                    storageRepository.uploadAndPublishPost(
+                        mediaUri = mediaUri,
+                        isVideo = isVideo,
+                        format = format,
+                        title = title,
+                        caption = caption,
+                        authorHandle = authorHandle,
+                        authorName = authorName,
+                        authorAvatar = authorAvatar,
+                        tags = tags
+                    )
+                }
+                uploadFlow.collect { result ->
                     when (result) {
                         is MediaPipelineResult.Uploading -> {
                             _uploadProgressPercent.value = result.progressPercent
@@ -469,7 +494,7 @@ class OmniViewModel @JvmOverloads constructor(
                             _isUploadingMedia.value = false
                             _uploadProgressPercent.value = null
                             _showMediaUploadScreen.value = false
-                            _effects.emit(OmniEffect.ShowToast("Media uploaded to Cloudinary and post saved to Firestore!"))
+                            _effects.emit(OmniEffect.ShowToast(if (isStory) "Story published and will expire after 24 hours." else "Media uploaded to Cloudinary and post saved to Firestore!"))
                         }
                         is MediaPipelineResult.Failed -> {
                             _isUploadingMedia.value = false
