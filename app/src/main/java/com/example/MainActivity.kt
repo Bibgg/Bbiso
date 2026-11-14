@@ -251,7 +251,7 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { viewModel.closeMediaUploadScreen() },
                         isUploading = uiState.isUploadingMedia,
                         uploadProgressPercent = uiState.uploadProgressPercent,
-                        initialCategory = UploadCategory.TUBE,
+                        initialCategory = if (uiState.isStoryUploadMode) UploadCategory.STORY else UploadCategory.TUBE,
                         onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
                             viewModel.uploadMediaAndPublish(
                                 mediaUri = mediaUri,
