@@ -86,13 +86,6 @@ fun CreatePostBottomSheet(
     var tagText by remember { mutableStateOf("") }
     var selectedCommunity by remember { mutableStateOf(communities.firstOrNull()) }
 
-    // Sample media options to simulate photo/video attachments
-    val sampleVideoUrl = "android.resource://com.aistudio.omnisocialbox.elmlpx/raw/sample_reel"
-    val sampleSnapUrls = listOf(
-        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1080&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1080&auto=format&fit=crop&q=80"
-    )
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -351,13 +344,13 @@ fun CreatePostBottomSheet(
                 onClick = {
                     if (isValid) {
                         val tags = tagText.split(",").map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }
-                        val media = when (selectedFormat) {
-                            PostFormat.TUBE -> listOf(sampleVideoUrl)
-                            PostFormat.SNAP -> sampleSnapUrls
-                            else -> emptyList()
-                        }
                         val title = if (selectedFormat == PostFormat.TUBE || selectedFormat == PostFormat.FORUM) titleText.trim() else null
-                        onSubmit(selectedFormat, title, bodyText.trim(), media, selectedCommunity, tags)
+                        if (selectedFormat == PostFormat.TUBE || selectedFormat == PostFormat.SNAP) {
+                            onDismiss()
+                            onOpenStudioMediaUpload()
+                        } else {
+                            onSubmit(selectedFormat, title, bodyText.trim(), emptyList(), selectedCommunity, tags)
+                        }
                     }
                 },
                 enabled = isValid,
