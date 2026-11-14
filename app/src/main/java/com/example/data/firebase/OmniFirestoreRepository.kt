@@ -262,6 +262,21 @@ class OmniFirestoreRepository(
         }
     }
 
+    /** Record one view per signed-in viewer for an active story. */
+    suspend fun markStoryViewed(storyId: String): Result<Unit> {
+        val uid = requireUserId()
+        val viewRef = db.collection("stories").document(storyId).collection("views").document(uid)
+        return try {
+            viewRef.set(mapOf("viewerUid" to uid, "viewedAt" to FieldValue.serverTimestamp())).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, viewRef.path)
+            Result.failure(e)
+        }
+    }
+
     /**
      * Real-time observation of user's backed-up liked post IDs
      */
