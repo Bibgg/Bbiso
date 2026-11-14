@@ -142,7 +142,7 @@ sealed interface UploadPhase {
 @Composable
 fun MediaUploadScreen(
     onDismiss: () -> Unit,
-    onPostCreated: (PostFormat, String?, String, Uri, Boolean, List<String>) -> Unit,
+    onPostCreated: (PostFormat, String?, String, Uri, Boolean, Boolean, List<String>) -> Unit,
     isUploading: Boolean = false,
     uploadProgressPercent: Int? = null,
     modifier: Modifier = Modifier
@@ -808,7 +808,7 @@ fun MediaUploadScreen(
 
             if (selectedCategory == UploadCategory.STORY) {
                 Text(
-                    text = "Story publishing will be connected with 24-hour expiry and viewer tracking in the next stage.",
+                    text = "Stories disappear from the feed after 24 hours.",
                     color = TextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -824,7 +824,7 @@ fun MediaUploadScreen(
             // 4. Primary Upload / Publish Button
             val isReady = selectedMediaUri != null &&
                     (selectedCategory != UploadCategory.TUBE || titleText.isNotBlank()) &&
-                    uploadPhase is UploadPhase.Idle && !isUploading && selectedCategory != UploadCategory.STORY
+                    uploadPhase is UploadPhase.Idle && !isUploading
 
             Button(
                 onClick = {
@@ -842,6 +842,7 @@ fun MediaUploadScreen(
                                 if (captionText.isNotBlank()) captionText else if (selectedCategory == UploadCategory.FILES) "Attached file: ${selectedFileName ?: "file"}" else "",
                                 uri,
                                 isVideo,
+                                selectedCategory == UploadCategory.STORY,
                                 tagsList
                             )
                         }
@@ -862,7 +863,7 @@ fun MediaUploadScreen(
             ) {
                 Text(
                     text = when (uploadPhase) {
-                        is UploadPhase.Idle -> if (selectedCategory == UploadCategory.STORY) "Story System Coming Soon" else "Upload to OmniBox"
+                        is UploadPhase.Idle -> if (selectedCategory == UploadCategory.STORY) "Share Story" else "Upload to OmniBox"
                         is UploadPhase.Uploading -> "Streaming Binary Chunks..."
                         is UploadPhase.Processing -> "Transcoding..."
                         is UploadPhase.Completed -> "Published!"
