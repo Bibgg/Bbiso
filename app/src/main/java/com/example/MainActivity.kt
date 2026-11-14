@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -247,9 +248,17 @@ class MainActivity : ComponentActivity() {
                 if (uiState.showMediaUploadScreen) {
                     MediaUploadScreen(
                         onDismiss = { viewModel.closeMediaUploadScreen() },
-                        onPostCreated = { format, title, body, mediaUrls, tags ->
-                            viewModel.createNewPost(format, title, body, mediaUrls, null, tags)
-                            viewModel.closeMediaUploadScreen()
+                        isUploading = uiState.isUploadingMedia,
+                        uploadProgressPercent = uiState.uploadProgressPercent,
+                        onPostCreated = { format, title, body, mediaUri, isVideo, tags ->
+                            viewModel.uploadMediaAndPublish(
+                                mediaUri = mediaUri,
+                                isVideo = isVideo,
+                                format = format,
+                                title = title,
+                                caption = body,
+                                tags = tags
+                            )
                         }
                     )
                 }
