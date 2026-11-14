@@ -29,20 +29,39 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # The repository currently has no Gradle Wrapper files, so provision Gradle directly.
+      # This project has no Gradle Wrapper, so install the Gradle version required by AGP.
       - name: Set up Gradle
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: '9.3.1'
           cache-disabled: false
 
+      # app/build.gradle.kts explicitly signs debug builds with this root-level keystore.
+      # Generate the standard Android debug key on the ephemeral GitHub runner.
+      - name: Generate Android debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+
       - name: Build Android debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify APK output
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Bbiso-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
