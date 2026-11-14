@@ -250,14 +250,15 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { viewModel.closeMediaUploadScreen() },
                         isUploading = uiState.isUploadingMedia,
                         uploadProgressPercent = uiState.uploadProgressPercent,
-                        onPostCreated = { format, title, body, mediaUri, isVideo, tags ->
+                        onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
                             viewModel.uploadMediaAndPublish(
                                 mediaUri = mediaUri,
                                 isVideo = isVideo,
                                 format = format,
                                 title = title,
                                 caption = body,
-                                tags = tags
+                                tags = tags,
+                                isStory = isStory
                             )
                         }
                     )
