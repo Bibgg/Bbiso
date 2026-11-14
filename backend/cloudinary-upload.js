@@ -29,7 +29,7 @@ function createUploadTicket({ uid, mediaType, purpose, env = process.env, now = 
   if (!["post", "story"].includes(purpose)) throw new Error("purpose must be post or story");
 
   const timestamp = Math.floor(now() / 1000);
-  const folder = `bbiso/users/${uid}/${purpose}s`;
+  const folder = `bbiso/users/${uid}/${purpose === "story" ? "stories" : "posts"}`;
   const publicId = uuid();
   const allowedFormats = mediaType === "video" ? VIDEO_FORMATS : IMAGE_FORMATS;
   const resourceType = mediaType === "video" ? "video" : "image";
