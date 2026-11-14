@@ -10,6 +10,8 @@ const { z } = require("zod");
 
 const app = express();
 app.disable("x-powered-by");
+// Render terminates TLS and forwards requests through one trusted proxy hop.
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : true }));
 app.use(express.json({ limit: "1mb" }));
@@ -71,7 +73,11 @@ async function requireAuth(req, res, next) {
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(60),
   email: z.string().trim().email().max(254),
-  password: z.string().min(10).max(72)
+  password: z.string().min(10).refine(value => Buffer.byteLength(value, "utf8") <= 72, "Password must be at most 72 UTF-8 bytes")
+});
+const loginSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(1).refine(value => Buffer.byteLength(value, "utf8") <= 72)
 });
 app.get("/health", (_req, res) => res.json({ ok: true, service: "bbiso-api", database: mongoose.connection.readyState === 1 ? "connected" : "disconnected" }));
 
@@ -90,9 +96,10 @@ app.post("/api/auth/register", async (req, res, next) => {
 });
 app.post("/api/auth/login", async (req, res, next) => {
   try {
-    const email = String(req.body.email || "").trim().toLowerCase();
-    const password = String(req.body.password || "");
-    if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+    const parsed = loginSchema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({ error: "Enter a valid email and password" });
+    const email = parsed.data.email.toLowerCase();
+    const password = parsed.data.password;
     const user = await User.findOne({ email }).select("+passwordHash");
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ error: "Email or password is incorrect" });
     res.json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email, handle: user.handle, avatarUrl: user.avatarUrl } });
@@ -130,8 +137,15 @@ app.post("/api/forum/:id/replies", requireAuth, async (req, res, next) => {
   try {
     const body = String(req.body.body || "").trim();
     if (body.length < 2 || body.length > 5000) return res.status(400).json({ error: "Reply must be 2-5000 characters" });
-    const post = await ForumPost.findByIdAndUpdate(req.params.id, { $push: { replies: { authorId: req.user._id, authorName: req.user.name, body } } }, { new: true, runValidators: true });
-    if (!post) return res.status(404).json({ error: "Forum post not found" });
+    const post = await ForumPost.findOneAndUpdate(
+      { _id: req.params.id, $expr: { $lt: [{ $size: { $ifNull: ["$replies", []] } }, 100] } },
+      { $push: { replies: { authorId: req.user._id, authorName: req.user.name, body } } },
+      { new: true, runValidators: true }
+    );
+    if (!post) {
+      const exists = await ForumPost.exists({ _id: req.params.id });
+      return res.status(exists ? 409 : 404).json({ error: exists ? "This discussion has reached its 100-reply limit" : "Forum post not found" });
+    }
     res.status(201).json({ item: post });
   } catch (e) { next(e); }
 });
@@ -145,7 +159,12 @@ app.get("/api/media", async (req, res, next) => {
 });
 app.post("/api/media", requireAuth, async (req, res, next) => {
   try {
-    const schema = z.object({ kind: z.enum(["tube","snap"]), caption: z.string().max(2000).optional().default(""), mediaUrl: z.string().url().max(2048), mimeType: z.string().max(120).optional().default("") });
+    const schema = z.object({
+      kind: z.enum(["tube","snap"]),
+      caption: z.string().trim().max(2000).optional().default(""),
+      mediaUrl: z.string().url().max(2048).refine(value => new URL(value).protocol === "https:", "Media URL must use HTTPS"),
+      mimeType: z.string().max(120).optional().default("")
+    });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Valid kind and media URL are required" });
     const item = await MediaPost.create({ ...parsed.data, authorId: req.user._id });
@@ -154,6 +173,8 @@ app.post("/api/media", requireAuth, async (req, res, next) => {
 });
 
 app.use((err, _req, res, _next) => {
+  if (err && err.type === "entity.too.large") return res.status(413).json({ error: "Request body is too large" });
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) return res.status(400).json({ error: "Malformed JSON request body" });
   if (err && err.code === 11000) return res.status(409).json({ error: "An account with these details already exists" });
   console.error("API error:", err.message);
   res.status(500).json({ error: "Internal server error" });
