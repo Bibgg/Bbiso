@@ -50,6 +50,9 @@ jobs:
             -keysize 2048 \
             -validity 10000
 
+      - name: Run Android unit tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
       - name: Build Android debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
