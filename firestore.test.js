@@ -221,3 +221,63 @@ test("Chat participant can update last-message preview without changing membersh
     lastMessage: "New message"
   }));
 });
+
+
+// 7. Story expiry and viewer records
+test("Authenticated user can publish own story with expiry within 24 hours", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertSucceeds(aliceDb.collection("stories").doc("story_alice").set({
+    storyId: "story_alice",
+    uid: ALICE_UID,
+    mediaUrl: "https://res.cloudinary.com/demo/video/upload/story.mp4",
+    mediaType: "video",
+    caption: "A short story",
+    expiresAt: new Date(Date.now() + 23 * 60 * 60 * 1000)
+  }));
+});
+
+test("User cannot publish a story under another user's UID", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertFails(aliceDb.collection("stories").doc("story_spoof").set({
+    storyId: "story_spoof",
+    uid: BOB_UID,
+    mediaUrl: "https://res.cloudinary.com/demo/image/upload/story.jpg",
+    mediaType: "photo",
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+  }));
+});
+
+test("Expired stories cannot be read", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("stories").doc("story_expired").set({
+      storyId: "story_expired",
+      uid: ALICE_UID,
+      mediaUrl: "https://res.cloudinary.com/demo/image/upload/story.jpg",
+      mediaType: "photo",
+      expiresAt: new Date(Date.now() - 60 * 1000)
+    });
+  });
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  await assertFails(bobDb.collection("stories").doc("story_expired").get());
+});
+
+test("A signed-in viewer can record one view for an active story", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("stories").doc("story_active").set({
+      storyId: "story_active",
+      uid: ALICE_UID,
+      mediaUrl: "https://res.cloudinary.com/demo/image/upload/story.jpg",
+      mediaType: "photo",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+    });
+  });
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  await assertSucceeds(bobDb.collection("stories").doc("story_active").collection("views").doc(BOB_UID).set({
+    viewerUid: BOB_UID,
+    viewedAt: new Date()
+  }));
+  await assertFails(bobDb.collection("stories").doc("story_active").collection("views").doc(ALICE_UID).set({
+    viewerUid: ALICE_UID,
+    viewedAt: new Date()
+  }));
+});
