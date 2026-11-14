@@ -144,7 +144,7 @@ class CloudinaryUploadRepository(
         val verifyJson = JSONObject()
             .put("mediaType", mediaType)
             .put("purpose", purpose)
-            .put("publicId", returnedPublicId)
+            .put("publicId", publicId)
             .put("secureUrl", secureUrl)
         val verifyRequest = Request.Builder()
             .url("$apiBaseUrl/api/media/verify-upload")
