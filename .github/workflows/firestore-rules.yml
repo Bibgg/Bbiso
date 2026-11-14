@@ -1,0 +1,37 @@
+name: Firestore Security Rules Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    name: Firestore Rules Emulator Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package.json
+
+      - name: Install Firebase test tools
+        run: npm install --no-save firebase-tools @firebase/rules-unit-testing firebase
+
+      - name: Run Firestore security tests
+        run: npx firebase emulators:exec --only firestore --project demo-no-project "node --test firestore.test.js"
