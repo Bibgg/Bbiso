@@ -154,3 +154,70 @@ test("Non-participant: cannot read or write to private chat", async () => {
     text: "Eavesdropping"
   }));
 });
+
+
+// 6. Chat membership and message integrity
+test("Chat participant cannot add an outsider to an existing chat", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("chats").doc("chat_locked").set({
+      chatId: "chat_locked",
+      participants: [ALICE_UID, BOB_UID],
+      lastMessage: "Hi"
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertFails(aliceDb.collection("chats").doc("chat_locked").update({
+    participants: [ALICE_UID, BOB_UID, "eve_999"]
+  }));
+});
+
+test("Chat participant cannot remove another participant", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("chats").doc("chat_locked").set({
+      chatId: "chat_locked",
+      participants: [ALICE_UID, BOB_UID],
+      lastMessage: "Hi"
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertFails(aliceDb.collection("chats").doc("chat_locked").update({
+    participants: [ALICE_UID]
+  }));
+});
+
+test("Message sender cannot transfer message ownership", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("chats").doc("chat_locked").set({
+      chatId: "chat_locked",
+      participants: [ALICE_UID, BOB_UID]
+    });
+    await context.firestore().collection("chats").doc("chat_locked")
+      .collection("messages").doc("msg_alice").set({
+        messageId: "msg_alice",
+        chatId: "chat_locked",
+        senderUid: ALICE_UID,
+        text: "Original"
+      });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertFails(aliceDb.collection("chats").doc("chat_locked")
+    .collection("messages").doc("msg_alice").update({ senderUid: BOB_UID }));
+});
+
+test("Chat participant can update last-message preview without changing membership", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("chats").doc("chat_locked").set({
+      chatId: "chat_locked",
+      participants: [ALICE_UID, BOB_UID],
+      lastMessage: "Old"
+    });
+  });
+
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertSucceeds(aliceDb.collection("chats").doc("chat_locked").update({
+    lastMessage: "New message"
+  }));
+});
