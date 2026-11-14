@@ -7,6 +7,8 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const { z } = require("zod");
+const { requireFirebaseAuth } = require("./firebase-auth");
+const { createUploadTicket } = require("./cloudinary-upload");
 
 const app = express();
 app.disable("x-powered-by");
@@ -16,6 +18,7 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : true }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
+app.use("/api/media/upload-signature", rateLimit({ windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 60 },
@@ -149,6 +152,21 @@ app.post("/api/forum/:id/replies", requireAuth, async (req, res, next) => {
     res.status(201).json({ item: post });
   } catch (e) { next(e); }
 });
+// Firebase ID tokens are verified against Google's published signing certificates.
+app.post("/api/media/upload-signature", requireFirebaseAuth(process.env.FIREBASE_PROJECT_ID), (req, res) => {
+  const schema = z.object({ mediaType: z.enum(["video", "image"]), purpose: z.enum(["post", "story"]) }).strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Choose a valid media type and upload purpose" });
+  try {
+    const ticket = createUploadTicket({ uid: req.firebaseUser.uid, mediaType: parsed.data.mediaType, purpose: parsed.data.purpose });
+    return res.json(ticket);
+  } catch (error) {
+    if (error.code === "CLOUDINARY_NOT_CONFIGURED") return res.status(503).json({ error: "Media uploads are temporarily unavailable" });
+    console.error("Cloudinary signing failed:", error.message);
+    return res.status(500).json({ error: "Could not prepare media upload" });
+  }
+});
+
 app.get("/api/media", async (req, res, next) => {
   try {
     const kind = ["tube","snap"].includes(String(req.query.kind)) ? String(req.query.kind) : null;
