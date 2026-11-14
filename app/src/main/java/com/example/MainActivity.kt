@@ -44,6 +44,7 @@ import com.example.ui.screens.ChatterScreen
 import com.example.ui.screens.ForumScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MediaUploadScreen
+import com.example.ui.screens.UploadCategory
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SnapScreen
@@ -163,7 +164,7 @@ class MainActivity : ComponentActivity() {
                                     currentUser = uiState.currentUser,
                                     selectedFilter = uiState.selectedFilter,
                                     onStoryClick = { story -> viewModel.openStory(story) },
-                                    onAddStoryClick = { viewModel.openCreateModal() },
+                                    onAddStoryClick = { viewModel.openStoryUploadScreen() },
                                     onLikeClick = { id -> viewModel.onToggleLike(id) },
                                     onVoteClick = { id, dir -> viewModel.onCastVote(id, dir) },
                                     onCommentClick = { id -> viewModel.openComments(id) },
@@ -250,6 +251,7 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { viewModel.closeMediaUploadScreen() },
                         isUploading = uiState.isUploadingMedia,
                         uploadProgressPercent = uiState.uploadProgressPercent,
+                        initialCategory = UploadCategory.TUBE,
                         onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
                             viewModel.uploadMediaAndPublish(
                                 mediaUri = mediaUri,
