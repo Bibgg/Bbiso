@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.audio.OmniGreetingEngine
 import com.example.ui.components.CommentsBottomSheet
-import com.example.ui.components.CreatePostBottomSheet
 import com.example.ui.components.OmniBottomBar
 import com.example.ui.components.OmniTopBar
 import com.example.ui.components.StoryViewerDialog
@@ -43,8 +42,8 @@ import com.example.ui.components.auth.AuthScreen
 import com.example.ui.screens.ChatterScreen
 import com.example.ui.screens.ForumScreen
 import com.example.ui.screens.HomeScreen
-import com.example.ui.screens.MediaUploadScreen
-import com.example.ui.screens.UploadCategory
+import com.example.ui.screens.CreateKind
+import com.example.ui.screens.CreateScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SnapScreen
@@ -141,7 +140,7 @@ class MainActivity : ComponentActivity() {
                             OmniBottomBar(
                                 currentTab = uiState.activeTab,
                                 onTabSelected = { tab -> viewModel.onTabSelected(tab) },
-                                onCreateClick = { viewModel.openCreateModal() }
+                                onCreateClick = { viewModel.openMediaUploadScreen() }
                             )
                         }
                     },
@@ -187,7 +186,7 @@ class MainActivity : ComponentActivity() {
                                     stories = uiState.stories,
                                     currentUser = uiState.currentUser,
                                     onStoryClick = { story -> viewModel.openStory(story) },
-                                    onAddStoryClick = { viewModel.openCreateModal() },
+                                    onAddStoryClick = { viewModel.openMediaUploadScreen() },
                                     onLikeClick = { id -> viewModel.onToggleLike(id) },
                                     onCommentClick = { id -> viewModel.openComments(id) },
                                     onBookmarkClick = { id -> viewModel.onToggleBookmark(id) }
@@ -230,36 +229,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Create Post Modal Sheet
-                if (uiState.showCreateModal) {
-                    CreatePostBottomSheet(
-                        communities = uiState.communities,
-                        onDismiss = { viewModel.closeCreateModal() },
-                        onSubmit = { format, title, body, mediaUrls, community, tags ->
-                            viewModel.createNewPost(format, title, body, mediaUrls, community, tags)
-                        },
-                        onOpenStudioMediaUpload = {
-                            viewModel.closeCreateModal()
-                            viewModel.openMediaUploadScreen()
-                        }
-                    )
-                }
-
-                // Studio Media Upload Screen (Full native picker, preview & chunk progress)
+                // Create screen (Upload Photo / Video Post / Reel / Story / Open Gallery)
                 if (uiState.showMediaUploadScreen) {
-                    MediaUploadScreen(
+                    CreateScreen(
                         onDismiss = { viewModel.closeMediaUploadScreen() },
                         isUploading = uiState.isUploadingMedia,
                         uploadProgressPercent = uiState.uploadProgressPercent,
-                        initialCategory = if (uiState.isStoryUploadMode) UploadCategory.STORY else UploadCategory.TUBE,
-                        onPostCreated = { format, title, body, mediaUri, isVideo, isStory, tags ->
+                        initialKind = if (uiState.isStoryUploadMode) CreateKind.STORY else null,
+                        onPost = { format, mediaUri, isVideo, isStory, caption ->
                             viewModel.uploadMediaAndPublish(
                                 mediaUri = mediaUri,
                                 isVideo = isVideo,
                                 format = format,
-                                title = title,
-                                caption = body,
-                                tags = tags,
+                                title = null,
+                                caption = caption,
+                                tags = emptyList(),
                                 isStory = isStory
                             )
                         }
