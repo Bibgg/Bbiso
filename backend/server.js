@@ -8,7 +8,7 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const { z } = require("zod");
 const { requireFirebaseAuth } = require("./firebase-auth");
-const { createUploadTicket } = require("./cloudinary-upload");
+const { createUploadTicket, verifyCloudinaryAsset } = require("./cloudinary-upload");
 
 const app = express();
 app.disable("x-powered-by");
@@ -164,6 +164,36 @@ app.post("/api/media/upload-signature", requireFirebaseAuth(process.env.FIREBASE
     if (error.code === "CLOUDINARY_NOT_CONFIGURED") return res.status(503).json({ error: "Media uploads are temporarily unavailable" });
     console.error("Cloudinary signing failed:", error.message);
     return res.status(500).json({ error: "Could not prepare media upload" });
+  }
+});
+
+app.post("/api/media/verify-upload", rateLimit({ windowMs: 60 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false }), requireFirebaseAuth(process.env.FIREBASE_PROJECT_ID), async (req, res) => {
+  const schema = z.object({
+    mediaType: z.enum(["video", "image"]),
+    purpose: z.enum(["post", "story"]),
+    publicId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
+    secureUrl: z.string().url().max(2048)
+  }).strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success || new URL(parsed.success ? parsed.data.secureUrl : "https://invalid.local").protocol !== "https:") {
+    return res.status(400).json({ error: "Valid uploaded media details are required" });
+  }
+  try {
+    const verified = await verifyCloudinaryAsset({
+      uid: req.firebaseUser.uid,
+      mediaType: parsed.data.mediaType,
+      purpose: parsed.data.purpose,
+      publicId: parsed.data.publicId,
+      secureUrl: parsed.data.secureUrl
+    });
+    return res.json(verified);
+  } catch (error) {
+    if (error.code === "CLOUDINARY_NOT_CONFIGURED") return res.status(503).json({ error: "Media verification is temporarily unavailable" });
+    if (error.code === "MEDIA_NOT_FOUND" || error.code === "MEDIA_VALIDATION_FAILED") {
+      return res.status(422).json({ error: "The uploaded media could not be verified" });
+    }
+    console.error("Cloudinary media verification failed:", error.message);
+    return res.status(502).json({ error: "Could not verify uploaded media" });
   }
 });
 

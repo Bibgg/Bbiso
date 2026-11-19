@@ -22,7 +22,6 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okio.BufferedSink
 import org.json.JSONObject
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 data class CloudinaryUploadResult(
@@ -141,6 +140,24 @@ class CloudinaryUploadRepository(
             throw IOException("Cloudinary returned an invalid media response")
         }
 
+        // Verify the uploaded object with Cloudinary Admin API through Render before publishing metadata.
+        val verifyJson = JSONObject()
+            .put("mediaType", mediaType)
+            .put("purpose", purpose)
+            .put("publicId", publicId)
+            .put("secureUrl", secureUrl)
+        val verifyRequest = Request.Builder()
+            .url("$apiBaseUrl/api/media/verify-upload")
+            .header("Authorization", "Bearer $idToken")
+            .post(RequestBody.create("application/json".toMediaTypeOrNull(), verifyJson.toString()))
+            .build()
+        val verified = executeJsonSuspend(verifyRequest, "Could not verify uploaded media")
+        if (!verified.optBoolean("verified") ||
+            verified.optString("secureUrl") != secureUrl ||
+            verified.optString("publicId") != returnedPublicId
+        ) {
+            throw IOException("The media service could not verify this upload")
+        }
         val thumbnail = if (isVideo) {
             secureUrl.replace("/upload/", "/upload/so_0,w_720,c_limit,q_auto,f_jpg/")
                 .replace(Regex("\\.(mp4|mov|m4v|webm)(\\?.*)?$", RegexOption.IGNORE_CASE), ".jpg")
