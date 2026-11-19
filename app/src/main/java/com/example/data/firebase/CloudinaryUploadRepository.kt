@@ -22,7 +22,6 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okio.BufferedSink
 import org.json.JSONObject
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 data class CloudinaryUploadResult(
