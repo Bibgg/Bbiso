@@ -5,12 +5,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,12 +45,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.PostFormat
+import com.example.ui.components.OmniInlineVideoPlayer
 import com.example.ui.theme.CyberCyan
+import com.example.ui.theme.DarkBorder
 import com.example.ui.theme.DarkSurfaceLow
 import com.example.ui.theme.DarkSurfaceMedium
 import com.example.ui.theme.NeonPurple
@@ -57,7 +63,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
-/** Simple one-screen video upload: pick a clip, add an optional caption, publish. */
+/** Premium dark, single-screen video upload. Reuses the existing secure publish pipeline. */
 @Composable
 fun VideoCreatorStudioScreen(
     onDismiss: () -> Unit,
@@ -69,6 +75,8 @@ fun VideoCreatorStudioScreen(
     var videoUri by remember { mutableStateOf<Uri?>(null) }
     var caption by remember { mutableStateOf("") }
     var fileName by remember { mutableStateOf("") }
+    var isPlaying by remember { mutableStateOf(true) }
+    var isMuted by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -76,81 +84,149 @@ fun VideoCreatorStudioScreen(
         if (uri != null) {
             videoUri = uri
             fileName = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "Selected video"
+            isPlaying = true
         }
     }
-
     val progress = (uploadProgressPercent ?: 0).coerceIn(0, 100)
+    val gradient = Brush.linearGradient(listOf(NeonPurple, Color(0xFFFF4E9B), Color(0xFFFFA43A)))
 
     Scaffold(
         modifier = modifier.fillMaxSize().background(OledBlack),
         containerColor = OledBlack,
         topBar = {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss, enabled = !isUploading, modifier = Modifier.testTag("creator_back")) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
-                Text("Upload video", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    Text("Bbiso", color = TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Create • Share • Enjoy", color = TextSecondary, fontSize = 10.sp)
+                }
                 Spacer(Modifier.weight(1f))
+                Text("✦", color = Color(0xFFFFC857), fontSize = 23.sp)
             }
         }
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding().imePadding()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(190.dp)
-                    .clip(RoundedCornerShape(20.dp))
+            Text("Upload Video", color = TextPrimary, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Turn your moments into amazing content ✨", color = TextSecondary, fontSize = 12.sp)
+
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
                     .background(DarkSurfaceLow)
-                    .clickable(enabled = !isUploading) {
-                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
-                    }
-                    .testTag("creator_pick_video"),
-                contentAlignment = Alignment.Center
+                    .border(1.dp, gradient, RoundedCornerShape(24.dp))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (videoUri == null) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(Modifier.size(58.dp).clip(CircleShape).background(NeonPurple), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = OledBlack, modifier = Modifier.size(30.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(145.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF281449), Color(0xFF17152D), Color(0xFF382044))
+                                )
+                            )
+                            .clickable(enabled = !isUploading) {
+                                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                            }
+                            .testTag("creator_pick_video"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(42.dp))
+                            Text("Choose a video", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text("Select from your gallery", color = TextSecondary, fontSize = 12.sp)
                         }
-                        Text("Choose video from gallery", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("Tap here to select a video", color = TextSecondary, fontSize = 12.sp)
                     }
                 } else {
-                    Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(38.dp))
-                        Text("Video selected", color = CyberCyan, fontWeight = FontWeight.Bold)
-                        Text(fileName, color = TextPrimary, fontSize = 12.sp, maxLines = 2)
-                        Text("Tap to change video", color = TextSecondary, fontSize = 11.sp)
-                    }
-                    IconButton(
-                        onClick = { videoUri = null; fileName = "" },
-                        enabled = !isUploading,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(32.dp)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().aspectRatio(9f / 12f)
+                            .clip(RoundedCornerShape(17.dp))
+                            .background(Color.Black)
+                            .testTag("creator_video_preview")
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Remove video", tint = TextPrimary)
+                        OmniInlineVideoPlayer(
+                            videoUrl = videoUri.toString(),
+                            thumbnailUrl = null,
+                            isPlaying = isPlaying,
+                            isMuted = isMuted,
+                            onTogglePlay = { isPlaying = !isPlaying },
+                            onToggleMute = { isMuted = !isMuted },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Row(
+                            Modifier.align(Alignment.TopStart).fillMaxWidth().padding(9.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "VIDEO PREVIEW",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clip(CircleShape).background(Color(0xAA000000)).padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                            Text(
+                                "Change",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clip(CircleShape).background(Color(0xAA000000))
+                                    .clickable(enabled = !isUploading) {
+                                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                                    }.padding(horizontal = 12.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(18.dp))
+                        Text(fileName, color = TextSecondary, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                        Text("Selected", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        IconButton(
+                            onClick = { videoUri = null; fileName = "" },
+                            enabled = !isUploading,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove video", tint = TextSecondary, modifier = Modifier.size(17.dp))
+                        }
                     }
                 }
+
+                Button(
+                    onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                    enabled = !isUploading,
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("creator_choose_video"),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB735E8), contentColor = Color.White)
+                ) {
+                    Icon(Icons.Default.VideoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(if (videoUri == null) "  Choose Video" else "  Choose Another Video", fontWeight = FontWeight.Bold)
+                }
+                Text("From Gallery  •  MP4, MOV and other supported formats", color = TextSecondary, fontSize = 10.sp)
             }
 
             OutlinedTextField(
                 value = caption,
                 onValueChange = { caption = it.take(2000) },
-                modifier = Modifier.fillMaxWidth().height(130.dp).testTag("creator_caption"),
-                label = { Text("Caption (optional)", color = TextSecondary) },
-                placeholder = { Text("Write something about your video…", color = TextMuted) },
+                modifier = Modifier.fillMaxWidth().height(112.dp).testTag("creator_caption"),
+                label = { Text("Add Caption", color = TextSecondary) },
+                placeholder = { Text("Write a caption… ❤️", color = TextMuted) },
                 enabled = !isUploading,
-                maxLines = 5,
-                shape = RoundedCornerShape(14.dp),
+                maxLines = 4,
+                shape = RoundedCornerShape(15.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = DarkSurfaceMedium,
                     unfocusedContainerColor = DarkSurfaceMedium,
                     focusedBorderColor = NeonPurple,
-                    unfocusedBorderColor = DarkSurfaceLow,
+                    unfocusedBorderColor = DarkBorder,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
                 )
@@ -159,16 +235,16 @@ fun VideoCreatorStudioScreen(
             if (isUploading) {
                 Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                        .background(DarkSurfaceMedium).padding(14.dp),
+                        .background(DarkSurfaceMedium).padding(13.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Uploading video…", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        Text("Uploading your video…", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                         Text("$progress%", color = CyberCyan, fontWeight = FontWeight.Bold)
                     }
                     LinearProgressIndicator(
                         progress = { progress / 100f },
-                        modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape),
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
                         color = NeonPurple,
                         trackColor = DarkSurfaceLow
                     )
@@ -184,17 +260,18 @@ fun VideoCreatorStudioScreen(
                 },
                 enabled = videoUri != null && !isUploading,
                 modifier = Modifier.fillMaxWidth().height(54.dp).testTag("creator_publish"),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = NeonPurple,
-                    contentColor = OledBlack,
+                    containerColor = Color(0xFFB735E8),
+                    contentColor = Color.White,
                     disabledContainerColor = DarkSurfaceMedium,
                     disabledContentColor = TextMuted
                 )
             ) {
                 Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(19.dp))
-                Text(if (isUploading) "Uploading…" else "  Upload video", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(if (isUploading) "Uploading…" else "  Upload", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
             }
+            Text("Fast • Easy • Secure", color = TextSecondary, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
     }
 }
